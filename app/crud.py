@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from .import models,schemas
 from datetime import datetime, timedelta
+from fastapi import HTTPException
 
 # 予約一覧
 def get_reservation(db: Session,skip:int =0, limit: int =100):
@@ -11,6 +12,16 @@ def get_reservation(db: Session,skip:int =0, limit: int =100):
 def create_reservation(db: Session,reservation:schemas.Reservation):
     
     print(f"Creating reservation: {reservation}")  # デバッグプリント
+    
+    #重複チェック
+    overlapping_reservations = db.query(models.Reservation).filter(
+        models.Reservation.startTime < reservation.endTime,
+        models.Reservation.endTime > reservation.startTime
+    ).all()
+    
+    if overlapping_reservations:
+        raise HTTPException(status_code=400, detail='予約が重複しています。別の時間を選択してください')
+    
     db_reservation = models.Reservation(
         userName = reservation.userName,
         startTime =reservation.startTime,

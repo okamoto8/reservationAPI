@@ -6,6 +6,7 @@ from typing import List
 from fastapi.middleware.cors import CORSMiddleware
 import logging
 from apscheduler.schedulers.background import BackgroundScheduler
+from fastapi.responses import JSONResponse
 
 models.Base.metadata.create_all(bind = engine)
 logging.basicConfig(level=logging.DEBUG)
@@ -37,7 +38,7 @@ manager = ConnectionManager()
 
 origins = [
     "http://localhost:3000",
-    "http://127.0.0.1:8000",
+    "http://127.0.0.1:3000",
     "http://10.111.170.194:8800"
     # 追加で許可したいオリジンがあればここに追加
 ]
@@ -47,6 +48,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    # allow_websockets=True,
 )
 
 connected_clients=[]
@@ -66,9 +68,13 @@ async def read_reservation(db:Session=Depends(get_db),skip:int =0,limit: int =10
 
 @app.post("/reservations",response_model=schemas.Reservation)
 async def create_reservation(reservation: schemas.ReservationCreate, db: Session = Depends(get_db)):
-    new_reservation = crud.create_reservation(db=db,reservation=reservation)
-    await manager.broadcast("New reservation added")
-    return new_reservation
+    try:
+        new_reservation = crud.create_reservation(db=db,reservation=reservation)
+        await manager.broadcast("New reservation added")
+        return new_reservation
+    except HTTPException as e:
+        return JSONResponse(status_code = e.status_code, content={"error":e.detail})
+        
 
 @app.delete("/reservations/{reservation_id}")
 async def delete_reservation(reservation_id: int, db: Session = Depends(get_db)):

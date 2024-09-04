@@ -4,7 +4,7 @@ from sqlalchemy.orm import sessionmaker
 from . import models
 
 # データベースURLの設定
-DATABASE_URL = "postgresql://postgres:zxcasd1234@localhost/reservation"
+DATABASE_URL = "postgresql://postgres:mahhy0801@localhost/reservation"
 
 # SQLAlchemyエンジンの作成
 engine = create_engine(DATABASE_URL)
