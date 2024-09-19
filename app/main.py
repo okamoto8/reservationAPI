@@ -8,6 +8,8 @@ import logging
 from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi.responses import JSONResponse
 
+
+
 models.Base.metadata.create_all(bind = engine)
 logging.basicConfig(level=logging.DEBUG)
 
@@ -61,10 +63,17 @@ def get_db():
     finally:
         db.close()
 
-@app.get("/reservations",response_model=List[schemas.Reservation])
-async def read_reservation(db:Session=Depends(get_db),skip:int =0,limit: int =100):
-    reservations = crud.get_reservation(db,skip=skip,limit=limit)
+
+@app.get("/reservations/{resource_id}",response_model=List[schemas.Reservation])
+async def read_reservation(resource_id: int, db:Session=Depends(get_db),skip:int =0,limit: int =100):
+    reservations = crud.get_reservations_by_resource(db,skip=skip,limit=limit,resource_id=resource_id)
     return reservations
+
+#DB設計変更前のメソッド
+# @app.get("/reservations",response_model=List[schemas.Reservation])
+# async def read_reservation(db:Session=Depends(get_db),skip:int =0,limit: int =100):
+#     reservations = crud.get_reservation(db,skip=skip,limit=limit)
+#     return reservations
 
 @app.post("/reservations",response_model=schemas.Reservation)
 async def create_reservation(reservation: schemas.ReservationCreate, db: Session = Depends(get_db)):
@@ -85,6 +94,7 @@ async def delete_reservation(reservation_id: int, db: Session = Depends(get_db))
         
         db.delete(reservation)
         db.commit()
+        
 
         await manager.broadcast(f"Reservation with ID {reservation_id}has been deleted")
 
@@ -121,3 +131,46 @@ async def websocket_endpoint(websocket:WebSocket):
         if websocket in connected_clients:
             connected_clients.remove(websocket)
 
+#リソースの取得（例：会議室A,B,C 貸し出し表：A,B,C）
+@app.get("/resources",response_model=List[schemas.Resource])
+async def read_resources(db:Session = Depends(get_db),skip:int =0,limit:int =100):
+    resources = crud.get_resources(db,skip=skip,limit=limit)
+    return resources
+
+#リソース単体の情報を取得
+@app.get("/resources/{resource_id}",response_model=schemas.Resource)
+async def read_resource(resource_id:int, db:Session = Depends(get_db)):
+    resource = crud.get_resource(db,resource_id)
+    return resource
+
+#リソースの登録
+@app.post("/resources",response_model=schemas.Resource)
+async def create_resource(resource:schemas.ResourceCreate,db: Session = Depends(get_db)):
+    return crud.create_resource(db=db,resource=resource)
+
+
+#リソースの削除
+@app.delete("/resources/{resource_id}")
+async def delete_resource(resource_id: int,db: Session = Depends(get_db)):
+    try:
+        resource = db.query(models.Resources).filter(models.Resources.resourceId == resource_id).first()
+        if resource is None:
+            raise HTTPException(status_code=404,detail="Resource not found")
+        
+        db.delete(resource)
+        db.commit()
+    except Exception as e:
+        logging.error(f"Error deleting resource:{e}")
+        raise HTTPException(status_code=500, detail="Internal Server Error")
+
+#リソースの名前の更新
+@app.put("/resources/{resource_id}",response_model=schemas.ResourceUpdate)
+async def update_resource(resource_id : int, resource_update:schemas.ResourceUpdate, db:Session =Depends(get_db)):
+    try:
+        updated_resource = crud.update_resource(db,resource_id,resource_update)
+        if updated_resource is None:
+            raise HTTPException(status_code=404,detail="Resource not found")
+        return updated_resource
+    except Exception as e:
+        logging.error(f"Error updating resource:{e}")
+        raise HTTPException(status_code=500,detail="Internal Server Error")

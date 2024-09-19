@@ -1,10 +1,15 @@
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-from . import models
+from dotenv import load_dotenv
+import os
+
+
+# .env ファイルから環境変数を読み込む
+load_dotenv()
 
 # データベースURLの設定
-DATABASE_URL = "postgresql://postgres:mahhy0801@localhost/reservation"
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 # SQLAlchemyエンジンの作成
 engine = create_engine(DATABASE_URL)
